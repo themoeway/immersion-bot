@@ -1,109 +1,181 @@
 import discord
 from discord.ext import commands
-from discord import app_commands
-import sqlite3
-import sys
+from datetime import datetime
+from datetime import date as datetime, timedelta
+from datetime import timedelta
+import json
 from typing import Optional
+from discord import app_commands
 from discord.app_commands import Choice
-from db import Store
-from common import emoji
-from datetime import date as new_date, datetime, timedelta
 
-db_name = "logs.db"
+import json
+from sql import Store, Set_Goal
 
-class Helpers:
-    def _media_type_counter(media_type):
-        if media_type == "BOOK":
-            return 'pgs'
-        elif media_type == "MANGA":
-            return 'pgs'
-        elif media_type == "VN":
-            return 'chars'
-        elif media_type == "ANIME":
-            return 'eps'
-        elif media_type == "LISTENING":
-            return 'mins'
-        elif media_type == "READTIME":
-            return 'mins'
-        elif media_type == "READING":
-            return 'chars'
-        else:
-            raise Exception(f'Unknown media type: {media_type}')
+import helpers
 
-    def media_type_converter_help(media_type):
-        if media_type == "BOOK":
-            return '1 point per page'
-        elif media_type == "MANGA":
-            return '0.2 points per page'
-        elif media_type == "VN":
-            return '1/350 points/character'
-        elif media_type == "ANIME":
-            return '9.5 points per episode'
-        elif media_type == "LISTENING":
-            return '0.45 points/min of listening'
-        elif media_type == "READTIME":
-            return '0.45 points/min of reading time'
-        elif media_type == "READING":
-            return '1/350 points/character of reading'
-        else:
-            raise Exception(f'Unknown media type: {media_type}')
-        
-    def _to_points(media_type, amount):
-        if media_type =="BOOK":
-            return amount
-        elif media_type =="MANGA":
-            return amount * 0.2
-        elif media_type =="VN":
-            return amount / 350.0
-        elif media_type =="ANIME":
-            return amount * 9.5
-        elif media_type =="LISTENING":
-            return amount * 0.45
-        elif media_type =="READTIME":
-            return amount * 0.45
-        elif media_type =="READING":
-            return amount / 350.0
-        else:
-            raise Exception(f'Unknown media type: {media_type}')
-        
-    def filter_logs(logs, now, tf, media_type):
-        if tf == "week":
-            last_week = now - timedelta(days=8)
-            tf_logs = [l for l in logs if l.created_at > last_week]
-        elif tf == "month":
-            tf_logs = [l for l in logs if l.created_at.month == now.month and l.created_at.year == now.year]
-        elif tf == "all":
-            tf_logs = logs
-        else:
-            raise Exception(f'Unknown timeframe {tf}')
+#############################################################
 
-        if not media_type:
-            return tf_logs
-        else:
-            return [l for l in tf_logs if l.media_type == media_type]
+_DB_NAME = 'prod.db'
+
+with open("cogs/jsons/settings.json") as json_file:
+    data_dict = json.load(json_file)
+    guildid = data_dict["guild_id"]
+  
+#############################################################
 
 
 class Log(commands.Cog):
-    def __init__(self, bot):
+
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-    
+
     @commands.Cog.listener()
     async def on_ready(self):
-        self.tmw = self.bot.get_guild(617136488840429598)
-    
-    @app_commands.command(name="log", description="Log your immersion.")
-    @app_commands.checks.has_role("Moderator")
-    @app_commands.choices(media = [Choice(name="Book", value="BOOK"), Choice(name="Manga", value="MANGA"), Choice(name="Visual Novel", value="VN"), Choice(name="Anime", value="ANIME"), Choice(name="Listening", value="LISTENING"), Choice(name="Readtime", value="READTIME")])
-    async def log(self, interaction: discord.Interaction, media: str, amount: int, description: Optional[str] = None):
-        if interaction.channel.id != 814947177608118273:
-            return await interaction.response.send_message(ephemeral=True, content=f"""Can't log in here. Use <#814947177608118273> to log.""")
+        self.myguild = self.bot.get_guild(guildid)
+   
+    @app_commands.command(name='log', description=f'Log your immersion')
+    @app_commands.describe(amount='''Episodes watched, characters or pages read. Time read/listened in [hr:min] or [min] for example '1.30' or '25'.''')
+    @app_commands.describe(comment='''Comment''')
+    @app_commands.describe(backlog='''Backlog to this date: [year-month-day] Example: December 1st 2022 '2022-12-01' ''')
+    @app_commands.describe(name='''You can use vndb IDs for VN and Anilist codes for Anime, Manga and Light Novels''')
+    @app_commands.choices(media_type = [Choice(name="Visual Novel", value="VN"), Choice(name="Manga", value="Manga"), Choice(name="Anime", value="Anime"), Choice(name="Book", value="Book"), Choice(name="Readtime", value="Readtime"), Choice(name="Listening", value="Listening"), Choice(name="Reading", value="Reading")])
+    async def log(self, interaction: discord.Interaction, media_type: str, amount: str, name: Optional[str], comment: Optional[str], backlog: Optional[str]):
+        await interaction.response.defer()
+        if interaction.channel.id != 947813835715256393: 
+        #if interaction.channel.id !=947813835715256393 or not isinstance(ctx.channel, discord.channel.DMChannel):
+            return await interaction.response.send_message(ephemeral=True, content='You can only log in #immersion-log or DMs.')
         
-        Store.new_log(db_name, interaction.guild_id, interaction.user.id, media, amount, description, interaction.created_at)
-        logs = Store.get_logs_by_user(db_name, interaction.guild_id, interaction.user.id)
-        month_logs = Helpers.filter_logs(logs=logs, now=interaction.created_at, tf="month")
-        old_points = sum(Helpers._to_points(l.media_type, l.amount) for l in month_logs)
-        diff = Helpers._to_points(media_type=media, amount=amount)
-        await interaction.response.send_message(content=f'{interaction.user.name} logged {amount} {Helpers._media_type_counter(media_type=media)} of {media.lower()} {emoji("InuPero")}\n{Helpers.media_type_converter_help(media_type=media)} → +{diff} points\n{interaction.created_at.strftime("%B")}: ~~{old_points}~~ → {old_points + diff}\n{description if description else ""}')
+        #Handeling amount when its given as a time
+        if media_type == "Listening" or media_type == "Readtime":
+            if ":" in amount:
+                hours, min = amount.split(":")
+                amount = int(hours) * 60 + int(min)
+            else:
+                amount = int(amount)
+        else:
+            amount = int(amount)
+            
+        if not amount > 0:
+            return await interaction.response.send_message(ephemeral=True, content='Only positive numers allowed.')
+        
+        if amount in [float('inf'), float('-inf')]:
+            return await interaction.response.send_message(ephemeral=True, content='No infinities allowed.')
+        
+        if backlog:
+            now = datetime.now()
+            created_at = datetime.now().replace(year=int(backlog.split("-")[0]), month=int(backlog.split("-")[1]), day=int(backlog.split("-")[2]), hour=0, minute=0, second=0, microsecond=0)
+            if now < created_at:
+                return await interaction.response.send_message(ephemeral=True, content='''You can't backlog in the future.''')
+            if now > created_at:
+                date = created_at
+        if not backlog:
+            date = datetime.now()
+  
+
+        def check_achievements(discord_user_id, media_type):
+            logs = store.get_logs_by_user(discord_user_id, media_type, None)
+            weighed_points_mediums = helpers.multiplied_points(logs)
+            abmt = helpers.calc_achievements(weighed_points_mediums)
+            if not bool(abmt):
+                return 0, 0, 0, "", "", "", ""
+            lower_interval, current_points, upper_interval, rank_emoji, rank_name, next_rank_emoji, next_rank_name = helpers.get_achievemnt_index(abmt)
+            
+            return lower_interval, current_points, upper_interval, rank_emoji, rank_name, next_rank_emoji, next_rank_name
+        
+        store = Set_Goal("goals.db")
+        then = date.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        now = interaction.created_at.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        goals = store.get_goals(interaction.user.id, (now, date)) + store.get_daily_goals(interaction.user.id) #getting goals for the current day and daily goals
+        point_goals = store.get_point_goals(interaction.user.id, (now, date))# getting point goals
+        
+        store = Store("prod.db")
+        first_date = date.replace(day=1, hour=0, minute=0, second=0) 
+        calc_amount, format, msg, title = helpers.point_message_converter(media_type.upper(), amount, name)
+        #returns weighed amount (i.e 1ep = 9.5 so weighed amount of 1 ANIME EP is 9.5), format (i.e chars, pages, etc), msg i.e 1/350 points/characters = x points, title is the anime/vn/manga title through anilist or vndb query
+        old_points = store.get_logs_by_user(interaction.user.id, None, (first_date, date)) #query to get logs of past month for monlthy point overview i.e ~~June: 2k~~ -> June: 2.1k
+        
+        old_weighed_points_mediums = helpers.multiplied_points(old_points) 
+        old_rank_achievement, old_achievemnt_points, old_next_achievement, old_emoji, old_rank_name, old_next_rank_emoji, old_next_rank_name = check_achievements(interaction.user.id, media_type.upper())
+        #returns achievemnt progress before log is getting registered to compare with achievement progress after log
+        
+        store.new_log(interaction.guild_id, interaction.user.id, media_type.upper(), amount, [title, comment], date) #log being registered 
+        
+        current_rank_achievement, current_achievemnt_points, new_rank_achievement, new_emoji, new_rank_name, new_next_rank_emoji, new_next_rank_name = check_achievements(interaction.user.id, media_type.upper())
+        #getting new achievement progress
+     
+        current_points = store.get_logs_by_user(interaction.user.id, None, (first_date, date)) #current total points
+        current_weighed_points_mediums = helpers.multiplied_points(current_points)
+
+        recent_logs = store.get_recent_goal_alike_logs(interaction.user.id, (now, date)) #getting logs of past day for goals
+
+        async def goals_row(discord_user_id, req_media_type, req_amount, text, created_at, frequency):
+            for log in recent_logs:
+                if log.media_type.value == req_media_type:
+                    if title == text:
+                        return f'''- {"~~" + str(log.amount) + "/" + str(req_amount) + " " + str(helpers.media_type_format(req_media_type.value)) + " " + text + "~~" if log.amount >= req_amount else str(log.amount) + "/" + req_amount + str(helpers.media_type_format(req_media_type.value)) + text}'''
+                    if title != text:
+                        return 
+                
+        goals_description = []
+
+        rl_notes_l = [note for media_type, amount, note in recent_logs]
+        rl_media_type_l = [media_type for media_type, amount, note in recent_logs]
+        rl_media_type_amount_l = [(media_type, amount) for media_type, amount, note in recent_logs]
+        #handling goals, i.e watch 3 eps of anime, read 3000 chars of VN by comparing two lists (goals and recent_logs)
+        if goals:
+            for goals_row in goals:
+                if recent_logs:
+                    if any(goals_row.text in text for text in rl_notes_l):
+                        indices = helpers.indices_text(recent_logs, goals_row.text)
+                        points = []
+                        for i in indices:
+                            points.append(recent_logs[i].da)
+                        goals_description.append(f'''- {"~~" + str(int(sum(points))) + "/" + str(int(goals_row.amount)) + " " + str(helpers.media_type_format(goals_row.media_type.value)) + " " + goals_row.text + "~~" if sum(points) >= goals_row.amount else str(int(sum(points))) + "/" + str(int(goals_row.amount)) + " " + str(helpers.media_type_format(goals_row.media_type.value)) + " " + goals_row.text} {"(" + goals_row.freq + ")" if goals_row.freq != None else ""}''')
+                        continue
+                    else:
+                        goals_description.append(f'''- 0/{goals_row.amount} {helpers.media_type_format(goals_row.media_type.value)} {goals_row.text} {"(" + goals_row.freq + ")" if goals_row.freq != None else ""}''')
+                        break
+                else:
+                    goals_description.append(f'''- 0/{goals_row.amount} {helpers.media_type_format(goals_row.media_type.value)} {goals_row.text} {"(" + goals_row.freq + ")" if goals_row.freq != None else ""}''')
+                    continue
+        
+        #handling point_goals
+        if point_goals:
+            for points_row in point_goals:
+                if recent_logs:
+                    if points_row.media_type in rl_media_type_l:
+                        indices = helpers.indices_media(recent_logs, points_row.media_type)
+                        points = []
+                        for i in indices:
+                            points.append(helpers._to_amount(recent_logs[i].media_type.value, recent_logs[i].da))
+                        goals_description.append(f'''- {sum(points)}/{points_row.amount} points {points_row.text} {"(" + points_row.freq + ")" if points_row.freq != None else ""}''')
+                        continue
+                    else:
+                        if points_row.media_type.value == "ANYTHING":
+                            points = []
+                            for media, amount in rl_media_type_amount_l:
+                                points.append(helpers._to_amount(media.value, amount))
+                            goals_description.append(f'''- {"~~" + str(round(sum(points), 0)) + "/" + str(points_row.amount) + " points " + points_row.text + (" (" + points_row.freq + ") " if points_row.freq != None else "") + "~~" if sum(points) >= points_row.amount else str(round(sum(points), 0)) + "/" + str(points_row.amount) + " points " + points_row.text + (" (" + points_row.freq + ") " if points_row.freq != None else "")}''')
+                            continue
+                        else:
+                            goals_description.append(f'''- 0/{points_row.amount} points {points_row.text} {"(" + points_row.freq + ")" if points_row.freq != None else ""}''')
+                            break
+                else:
+                    goals_description.append(f'''- 0/{points_row.amount} points {points_row.text} {"(" + points_row.freq + ")" if points_row.freq != None else ""}''')
+                    continue
+        goals_description = '\n'.join(goals_description)
+
+        print(goals_description)
     
+        #final log message
+        await interaction.edit_original_response(content=f'''{interaction.user.mention} logged {round(amount,2)} {format} {title}\n{msg}\n\n{"""__**Goal progression:**__
+""" + str(goals_description) + """
+""" if goals_description else ""}{date.strftime("%B")}: ~~{helpers.millify(sum(i for i, j in list(old_weighed_points_mediums.values())))}~~ → {helpers.millify(sum(i for i, j in list(current_weighed_points_mediums.values())))}\n{"""
+**Next Achievement: **""" + new_next_rank_name + " " + new_next_rank_emoji + " in " + str(new_rank_achievement-current_achievemnt_points) + " " + helpers.media_type_format(media_type.upper()) if old_next_achievement == new_rank_achievement else """
+**New Achievemnt Unlocked: **""" + new_rank_name + " " + new_emoji + " " + str(int(current_rank_achievement)) + " " + helpers.media_type_format(media_type.upper()) + """
+**Next Achievement:** """ + new_next_rank_name + " " + new_next_rank_emoji + " " + str(int(new_rank_achievement)) + " " + helpers.media_type_format(media_type.upper())}\n\n{">>> " + comment if comment else ""}''')
+        
+        
 async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(Log(bot))                    
+    await bot.add_cog(Log(bot))
