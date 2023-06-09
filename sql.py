@@ -201,29 +201,27 @@ class Set_Goal:
             
     def get_point_goals(self, discord_user_id, timeframe):
         where_clause = f"discord_user_id={discord_user_id} AND created_at BETWEEN '{timeframe[0]}' AND '{timeframe[1]}'"
-        table = 'points'
         query = f"""
-        SELECT * FROM {table}
+        SELECT * FROM points
         WHERE {where_clause}
         ORDER BY created_at DESC;
         """
         print(query)
         cursor = self.conn.cursor()
         cursor.execute(query)
-        return cursor.fetchall(), [table]
+        return cursor.fetchall()
             
     def get_goals(self, discord_user_id, timeframe):
         where_clause = f"discord_user_id={discord_user_id} AND created_at BETWEEN '{timeframe[0]}' AND '{timeframe[1]}' AND freq IS NULL"
-        table = 'goals'
         query = f"""
-        SELECT * FROM {table}
+        SELECT * FROM goals
         WHERE {where_clause}
         ORDER BY created_at DESC;
         """
         print(query)
         cursor = self.conn.cursor()
         cursor.execute(query)
-        return cursor.fetchall(), [table]
+        return cursor.fetchall()
     
     def get_goal_by_medium(self, discord_user_id, timeframe, media_type):
         where_clause = f"discord_user_id={discord_user_id} AND media_type='{media_type.upper()}' AND created_at BETWEEN '{timeframe[0]}' AND '{timeframe[1]}'"
