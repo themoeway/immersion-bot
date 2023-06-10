@@ -182,28 +182,60 @@ class Log(commands.Cog):
 **Next Achievement:** """ + new_next_rank_name + " " + new_next_rank_emoji + " " + str(int(new_rank_achievement)) + " " + helpers.media_type_format(media_type.upper())}\n\n{">>> " + comment if comment else ""}''')
 
     @log.autocomplete('name')
-    async def log_vn_autocomplete(self, interaction: discord.Interaction, current: str,) -> List[app_commands.Choice[str]]:
-        if (interaction.namespace['media_type'] != "VN"):
-            return
+    async def log_autocomplete(self, interaction: discord.Interaction, current: str,) -> List[app_commands.Choice[str]]:
 
         await interaction.response.defer()
+        suggestions = []
 
-        vndb_url = "https://api.vndb.org/kana/vn"
-        data = {"filters": ["search", "=", f"{current}"], "fields": "title"} # default no. of results is 10
-        headers = {"Content-Type": "application/json"}
+        if interaction.namespace['media_type'] == 'VN':
+            url = 'https://api.vndb.org/kana/vn'
+            data = {'filters': ['search', '=', f'{current}'], 'fields': 'title, alttitle'} # default no. of results is 10
+        
+        elif interaction.namespace['media_type'] == 'Anime':
+            url = 'https://graphql.anilist.co'
+            query = '''
+            query ($page: Int, $perPage: Int, $title: String) {
+                Page(page: $page, perPage: $perPage) {
+                    pageInfo {
+                        total
+                        perPage
+                    }
+                    media (search: $title, type: ANIME) {
+                        id
+                        title {
+                            romaji
+                            native
+                        }
+                    }
+                }
+            }
+            '''
+
+            variables = {
+                'title': current,
+                'page': 1,
+                'perPage': 10
+            }
+
+            data = {'query': query, 'variables': variables}
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(vndb_url, data=json.dumps(data), headers=headers) as resp:
+            async with session.post(url, json=data) as resp:
                 log.info(resp.status)
                 json_data = await resp.json()
-                vns = [value for result in json_data['results'] for key, value in result.items() if (key == "title")]
 
-                await asyncio.sleep(delay=0)
+                if interaction.namespace['media_type'] == 'VN':
+                    suggestions = [result['title'] if result['alttitle'] is None else f"{result['title']} ({result['alttitle']})" for result in json_data['results']] 
+
+                elif interaction.namespace['media_type'] == 'Anime':
+                    suggestions = [f"{value['romaji']} ({value['native']})" for result in json_data['data']['Page']['media'] for key, value in result.items() if (key == 'title')]
+
+                await asyncio.sleep(0)
 
                 return [
-                    app_commands.Choice(name=vn, value=vn)
-                    for vn in vns if current.lower() in vn.lower()
+                    app_commands.Choice(name=suggestion, value=suggestion)
+                    for suggestion in suggestions if current.lower() in suggestion.lower()
                 ]
-        
+
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Log(bot))
