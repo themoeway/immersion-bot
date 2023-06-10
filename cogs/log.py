@@ -228,13 +228,13 @@ class Log(commands.Cog):
                     suggestions = [result['title'] if result['alttitle'] is None else f"{result['title']} ({result['alttitle']})" for result in json_data['results']] 
 
                 elif interaction.namespace['media_type'] == 'Anime':
-                    suggestions = [f"{value['romaji']} ({value['native']})" for result in json_data['data']['Page']['media'] for key, value in result.items() if (key == 'title')]
+                    suggestions = [(f"{result['title']['romaji']} ({result['title']['native']})", result['id']) for result in json_data['data']['Page']['media'] for key, value in result.items()]
 
                 await asyncio.sleep(0)
 
                 return [
-                    app_commands.Choice(name=suggestion, value=suggestion)
-                    for suggestion in suggestions if current.lower() in suggestion.lower()
+                    app_commands.Choice(name=title, value=str(id))
+                    for title, id in suggestions if current.lower() in title.lower()
                 ]
 
 async def setup(bot: commands.Bot) -> None:
