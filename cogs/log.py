@@ -225,7 +225,7 @@ class Log(commands.Cog):
                 json_data = await resp.json()
 
                 if interaction.namespace['media_type'] == 'VN':
-                    suggestions = [result['title'] if result['alttitle'] is None else f"{result['title']} ({result['alttitle']})" for result in json_data['results']] 
+                    suggestions = [(result['title'], result['id']) for result in json_data['results']]
 
                 elif interaction.namespace['media_type'] == 'Anime':
                     suggestions = [(f"{result['title']['romaji']} ({result['title']['native']})", result['id']) for result in json_data['data']['Page']['media'] for key, value in result.items()]
