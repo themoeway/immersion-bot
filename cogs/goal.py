@@ -26,7 +26,6 @@ _DB_NAME = 'prod.db'
 with open("cogs/jsons/settings.json") as json_file:
     data_dict = json.load(json_file)
     guildid = data_dict["guild_id"]
-    _COMMANDS_CHANNEL_ID = data_dict["_COMMANDS_CHANNEL_ID"]
   
 #############################################################
 
