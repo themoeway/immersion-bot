@@ -1,0 +1,5 @@
+env/
+__pycache__/
+cogs/__pycache__/
+
+token_new.txt
