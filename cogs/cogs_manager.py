@@ -74,7 +74,7 @@ class BotManager(commands.Cog):
         else:
             await interaction.edit_original_response(content='**`SUCCESS`**')
             
-     class CogSelectView(discord.ui.View):
+    #  class CogSelectView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction):
         return interaction.user.guild_permissions.administrator

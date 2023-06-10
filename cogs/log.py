@@ -1,17 +1,21 @@
 import discord
 from discord.ext import commands
-from datetime import datetime
-from datetime import date as datetime, timedelta
-from datetime import timedelta
+from datetime import datetime, timedelta
 import json
 from typing import Optional
 from discord import app_commands
 from discord.app_commands import Choice
+from typing import List
 
 import json
 from sql import Store, Set_Goal
 
 import helpers
+
+import logging
+import aiohttp
+import asyncio
+
 
 #############################################################
 
@@ -20,6 +24,8 @@ _DB_NAME = 'prod.db'
 with open("cogs/jsons/settings.json") as json_file:
     data_dict = json.load(json_file)
     guildid = data_dict["guild_id"]
+
+log = logging.getLogger(__name__)
   
 #############################################################
 
@@ -32,12 +38,12 @@ class Log(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         self.myguild = self.bot.get_guild(guildid)
-   
+
     @app_commands.command(name='log', description=f'Log your immersion')
     @app_commands.describe(amount='''Episodes watched, characters or pages read. Time read/listened in [hr:min] or [min] for example '1.30' or '25'.''')
     @app_commands.describe(comment='''Comment''')
     @app_commands.describe(backlog='''Backlog to this date: [year-month-day] Example: December 1st 2022 '2022-12-01' ''')
-    @app_commands.describe(name='''You can use vndb IDs for VN and Anilist codes for Anime, Manga and Light Novels''')
+    @app_commands.describe(name='''You can use vndb IDs and titles for VN and Anilist codes for Anime, Manga and Light Novels''')
     @app_commands.choices(media_type = [Choice(name="Visual Novel", value="VN"), Choice(name="Manga", value="Manga"), Choice(name="Anime", value="Anime"), Choice(name="Book", value="Book"), Choice(name="Readtime", value="Readtime"), Choice(name="Listening", value="Listening"), Choice(name="Reading", value="Reading")])
     async def log(self, interaction: discord.Interaction, media_type: str, amount: str, name: Optional[str], comment: Optional[str], backlog: Optional[str]):
         await interaction.response.defer()
@@ -56,7 +62,7 @@ class Log(commands.Cog):
             amount = int(amount)
             
         if not amount > 0:
-            return await interaction.response.send_message(ephemeral=True, content='Only positive numers allowed.')
+            return await interaction.response.send_message(ephemeral=True, content='Only positive numbers allowed.')
         
         if amount in [float('inf'), float('-inf')]:
             return await interaction.response.send_message(ephemeral=True, content='No infinities allowed.')
@@ -71,7 +77,6 @@ class Log(commands.Cog):
         if not backlog:
             date = datetime.now()
   
-
         def check_achievements(discord_user_id, media_type):
             logs = store.get_logs_by_user(discord_user_id, media_type, None)
             weighed_points_mediums = helpers.multiplied_points(logs)
@@ -175,7 +180,30 @@ class Log(commands.Cog):
 **Next Achievement: **""" + new_next_rank_name + " " + new_next_rank_emoji + " in " + str(new_rank_achievement-current_achievemnt_points) + " " + helpers.media_type_format(media_type.upper()) if old_next_achievement == new_rank_achievement else """
 **New Achievemnt Unlocked: **""" + new_rank_name + " " + new_emoji + " " + str(int(current_rank_achievement)) + " " + helpers.media_type_format(media_type.upper()) + """
 **Next Achievement:** """ + new_next_rank_name + " " + new_next_rank_emoji + " " + str(int(new_rank_achievement)) + " " + helpers.media_type_format(media_type.upper())}\n\n{">>> " + comment if comment else ""}''')
-        
+
+    @log.autocomplete('name')
+    async def log_vn_autocomplete(self, interaction: discord.Interaction, current: str,) -> List[app_commands.Choice[str]]:
+        if (interaction.namespace['media_type'] != "VN"):
+            return
+
+        await interaction.response.defer()
+
+        vndb_url = "https://api.vndb.org/kana/vn"
+        data = {"filters": ["search", "=", f"{current}"], "fields": "title"} # default no. of results is 10
+        headers = {"Content-Type": "application/json"}
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(vndb_url, data=json.dumps(data), headers=headers) as resp:
+                log.info(resp.status)
+                json_data = await resp.json()
+                vns = [value for result in json_data['results'] for key, value in result.items() if (key == "title")]
+
+                await asyncio.sleep(delay=0)
+
+                return [
+                    app_commands.Choice(name=vn, value=vn)
+                    for vn in vns if current.lower() in vn.lower()
+                ]
         
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Log(bot))
