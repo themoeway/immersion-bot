@@ -2,4 +2,5 @@ env/
 __pycache__/
 cogs/__pycache__/
 
+.env
 token_new.txt
