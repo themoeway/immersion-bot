@@ -11,13 +11,17 @@ from datetime import date as new_date, datetime, timedelta
 
 db_name = "logs.db"
 
+with open("cogs/jsons/settings.json") as json_file:
+    data_dict = json.load(json_file)
+    guildid = data_dict["guild_id"]
+
 class Log(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
     
     @commands.Cog.listener()
     async def on_ready(self):
-        self.tmw = self.bot.get_guild(617136488840429598)
+        self.tmw = self.bot.get_guild(guildid)
     
     @app_commands.command(name="undo", description="undo your log.")
     @app_commands.checks.has_role("Moderator")
