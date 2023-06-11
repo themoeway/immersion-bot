@@ -142,8 +142,9 @@ def point_message_converter(media_type, amount, name):
         amount = amount * 0.2
         if name and name.isdigit():
             anilist = Anilist()
-            updated_title = anilist.get_manga_with_id(name)["name_english"].replace(" ", "-")
-            return amount, "pgs", f"0.2 points per page → +{round(amount, 2)} points", ("of " + "[" + anilist.get_manga_with_id(name)["name_english"] + "]" + "(" + f"<https://anilist.co/manga/{name}/{updated_title}/>" + ")" if name else "")
+            name_key = f"name_{'english' if anilist.get_manga_with_id(name)['name_english'] else 'romaji'}"
+            updated_title = anilist.get_manga_with_id(name)[name_key].replace(" ", "-")
+            return amount, "pgs", f"0.2 points per page → +{round(amount, 2)} points", ("of " + "[" + anilist.get_manga_with_id(name)[name_key] + "]" + "(" + f"<https://anilist.co/manga/{name}/{updated_title}/>" + ")" if name else "")
         if name:
             return amount, "pgs", f"0.2 points per page → +{round(amount, 2)} points", name
         return amount, "pgs", f"0.2 points per page → +{round(amount, 2)} points", f"of {media_type}" 
@@ -157,8 +158,9 @@ def point_message_converter(media_type, amount, name):
         amount = amount * 9.5
         if name and name.isdigit():
             anilist = Anilist()
-            updated_title = anilist.get_anime_with_id(name)["name_english"].replace(" ", "-")
-            return amount, "eps", f"9.5 points per eps → +{round(amount, 2)} points", ("of " + "[" + anilist.get_anime_with_id(name)["name_english"] + "]" + "(" + f"<https://anilist.co/anime/{name}/{updated_title}/>" + ")" if name else "")
+            name_key = f"name_{'english' if anilist.get_anime_with_id(name)['name_english'] else 'romaji'}"
+            updated_title = anilist.get_anime_with_id(name)[name_key].replace(" ", "-")
+            return amount, "eps", f"9.5 points per eps → +{round(amount, 2)} points", ("of " + "[" + anilist.get_anime_with_id(name)[name_key] + "]" + "(" + f"<https://anilist.co/anime/{name}/{updated_title}/>" + ")" if name else "")
         if name:
             return amount, "eps", f"9.5 points per eps → +{round(amount, 2)} points", name
         return amount, "eps", f"9.5 points per eps → +{round(amount, 2)} points", f"of {media_type}" 
