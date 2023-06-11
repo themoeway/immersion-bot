@@ -185,30 +185,32 @@ class Log(commands.Cog):
     async def log_autocomplete(self, interaction: discord.Interaction, current: str,) -> List[app_commands.Choice[str]]:
 
         await interaction.response.defer()
+        media_type = interaction.namespace['media_type']
         suggestions = []
+        url = ''
 
-        if interaction.namespace['media_type'] == 'VN':
+        if media_type == 'VN':
             url = 'https://api.vndb.org/kana/vn'
             data = {'filters': ['search', '=', f'{current}'], 'fields': 'title, alttitle'} # default no. of results is 10
         
-        elif interaction.namespace['media_type'] == 'Anime':
+        elif media_type == 'Anime' or media_type == 'Manga':
             url = 'https://graphql.anilist.co'
-            query = '''
-            query ($page: Int, $perPage: Int, $title: String) {
-                Page(page: $page, perPage: $perPage) {
-                    pageInfo {
+            query = f'''
+            query ($page: Int, $perPage: Int, $title: String) {{
+                Page(page: $page, perPage: $perPage) {{
+                    pageInfo {{
                         total
                         perPage
-                    }
-                    media (search: $title, type: ANIME) {
+                    }}
+                    media (search: $title, type: {media_type.upper()}) {{
                         id
-                        title {
+                        title {{
                             romaji
                             native
-                        }
-                    }
-                }
-            }
+                        }}
+                    }}
+                }}
+            }}
             '''
 
             variables = {
@@ -219,15 +221,18 @@ class Log(commands.Cog):
 
             data = {'query': query, 'variables': variables}
 
+        if not url:
+            return []
+
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=data) as resp:
                 log.info(resp.status)
                 json_data = await resp.json()
 
-                if interaction.namespace['media_type'] == 'VN':
+                if media_type == 'VN':
                     suggestions = [(result['title'], result['id']) for result in json_data['results']]
 
-                elif interaction.namespace['media_type'] == 'Anime':
+                elif media_type == 'Anime' or media_type == 'Manga':
                     suggestions = [(f"{result['title']['romaji']} ({result['title']['native']})", result['id']) for result in json_data['data']['Page']['media']]
 
                 await asyncio.sleep(0)
