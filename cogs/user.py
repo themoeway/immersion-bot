@@ -107,7 +107,7 @@ class User(commands.Cog):
                 for media_type in reversed(MediaType):
                     log_dict[media_type.value].setdefault((new_date(year, month, 1).strftime("%b/%y")), 0)
             for log in logs:
-                log_dict[log.media_type.value][log.created_at.strftime("%b/%y")] += helpers._to_amount(log.media_type, log.amount)
+                log_dict[log.media_type.value][log.created_at.strftime("%b/%y")] += helpers._to_amount(log.media_type.value, log.amount)
 
         else:
             # Set empty days to 0
@@ -115,7 +115,7 @@ class User(commands.Cog):
                 for date in daterange(start_date, end_date):
                     log_dict[media_type.value].setdefault(date.date(), 0)
             for log in logs:
-                log_dict[log.media_type.value][log.created_at.date()] += helpers._to_amount(log.media_type, log.amount)
+                log_dict[log.media_type.value][log.created_at.date()] += helpers._to_amount(log.media_type.value, log.amount)
             log_dict = dict(sorted(log_dict.items()))
 
         fig, ax = plt.subplots(figsize=(16, 12))
@@ -159,9 +159,11 @@ class User(commands.Cog):
         embed.add_field(name='**Points**', value=helpers.millify(sum(i for i, j in list(weighed_points_mediums.values()))))
         amounts_by_media_desc = '\n'.join(f'{key}: {helpers.millify(weighed_points_mediums[key][1])} {helpers.media_type_format(key)} → {helpers.millify(weighed_points_mediums[key][0])} pts' for key in weighed_points_mediums)
         embed.add_field(name='**Breakdown**', value=amounts_by_media_desc or 'None', inline=False)
+        
         await self.generate_trend_graph(timeframe, interaction, weighed_points_mediums, logs)
         file = discord.File(fr'''{[file for file in os.listdir() if file.endswith('_overview_chart.png')][0]}''')
         embed.set_image(url=f"attachment://{interaction.user.id}_overview_chart.png")
+        
         return embed, file
                 
     @app_commands.command(name='user', description=f'Immersion overview of a user.')
@@ -180,9 +182,12 @@ class User(commands.Cog):
         else:
             now = datetime.now().replace(year=int(date.split("-")[0]), month=int(date.split("-")[1]), day=int(date.split("-")[2]), hour=0, minute=0, second=0, microsecond=0)
         
-        now, start, end, title = await self.start_end_tf(now, timeframe)
+        now, start, end, title = helpers.start_end_tf(now, timeframe)
         store = Store(_DB_NAME)
-        logs = store.get_logs_by_user(236887182571339777, media_type, (now, start, end))
+        logs = store.get_logs_by_user(236887182571339777, media_type, (start, end))
+        if logs == []:
+            return await interaction.edit_original_response(content='No logs were found.')
+        
         weighed_points_mediums = helpers.multiplied_points(logs)
         embed, file = await self.create_embed(timeframe, interaction, weighed_points_mediums, logs)
         
