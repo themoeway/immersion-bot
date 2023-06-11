@@ -18,10 +18,15 @@ from sql import Set_Goal, Store
 import time
 
 import helpers
+import os
+from dotenv import load_dotenv
 
 #############################################################
 
+load_dotenv()
+
 _DB_NAME = 'prod.db'
+CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
 
 with open("cogs/jsons/settings.json") as json_file:
     data_dict = json.load(json_file)
@@ -162,7 +167,7 @@ class Goal(commands.Cog):
     @app_commands.choices(frequency = [Choice(name="Daily", value="Daily")])
     @app_commands.describe(frequency='Make this your daily goal for the month.')
     async def set_goal(self, interaction: discord.Interaction, media_type: str, amount: str, name: Optional[str], frequency: Optional[str]):
-        if interaction.channel.id != 947813835715256393:
+        if interaction.channel.id != CHANNEL_ID:
             return await interaction.response.send_message(ephemeral=True, content='You can only log in #immersion-log or DMs.')
         
         if media_type == "Listening" or media_type == "Readtime":
@@ -199,7 +204,7 @@ class Goal(commands.Cog):
     @app_commands.choices(frequency = [Choice(name="Daily", value="Daily")])
     @app_commands.describe(frequency='Make this your daily goal for the month.')
     async def set_goal_points(self, interaction: discord.Interaction, media_type: str, amount: int, frequency: Optional[str]):
-        if interaction.channel.id != 947813835715256393:
+        if interaction.channel.id != CHANNEL_ID:
             return await interaction.response.send_message(ephemeral=True, content='You can only log in #immersion-log or DMs.')
             
         if not amount > 0:
@@ -219,7 +224,7 @@ class Goal(commands.Cog):
         
     @app_commands.command(name='goals', description=f'See your immersion log goal overview.')
     async def goals(self, interaction: discord.Interaction):
-        if interaction.channel.id != 947813835715256393:
+        if interaction.channel.id != CHANNEL_ID:
             return await interaction.response.send_message(ephemeral=True, content='You can only log in #immersion-log or DMs.')
 
         async def goals_row(discord_user_id, media_type, amount, text, created_at, frequency):

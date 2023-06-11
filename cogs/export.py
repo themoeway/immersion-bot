@@ -10,10 +10,13 @@ import xlsxwriter
 import os
 import asyncio
 import helpers
-
+from dotenv import load_dotenv
 #############################################################
 
+load_dotenv()
+
 _DB_NAME = 'prod.db'
+CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
 
 with open("cogs/jsons/settings.json") as json_file:
     data_dict = json.load(json_file)
@@ -46,7 +49,7 @@ class Export(commands.Cog):
     @app_commands.choices(media_type = [Choice(name="Visual Novels", value="VN"), Choice(name="Manga", value="MANGA"), Choice(name="Anime", value="ANIME"), Choice(name="Book", value="BOOK"), Choice(name="Readtime", value="READTIME"), Choice(name="Listening", value="LISTENING"), Choice(name="Reading", value="READING")])
     @app_commands.describe(date='''See past user overviews, combine it wit timeframes: [year-month-day] Example: '2022-12-29'.''')
     async def export(self, interaction: discord.Interaction, timeframe: str, media_type: Optional[str], date: Optional[str]):
-        if interaction.channel.id != 947813835715256393:
+        if interaction.channel.id != CHANNEL_ID:
             return await interaction.response.send_message(ephemeral=True, content='You can only log in #immersion-log or DMs.')
     
         await interaction.response.defer()

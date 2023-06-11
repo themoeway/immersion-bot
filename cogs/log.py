@@ -6,20 +6,20 @@ from typing import Optional
 from discord import app_commands
 from discord.app_commands import Choice
 from typing import List
-
 import json
 from sql import Store, Set_Goal
-
 import helpers
-
 import logging
 import aiohttp
 import asyncio
-
-
+import os
+from dotenv import load_dotenv
 #############################################################
 
+load_dotenv()
+
 _DB_NAME = 'prod.db'
+CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
 
 with open("cogs/jsons/settings.json") as json_file:
     data_dict = json.load(json_file)
@@ -47,7 +47,7 @@ class Log(commands.Cog):
     @app_commands.choices(media_type = [Choice(name="Visual Novel", value="VN"), Choice(name="Manga", value="Manga"), Choice(name="Anime", value="Anime"), Choice(name="Book", value="Book"), Choice(name="Readtime", value="Readtime"), Choice(name="Listening", value="Listening"), Choice(name="Reading", value="Reading")])
     async def log(self, interaction: discord.Interaction, media_type: str, amount: str, name: Optional[str], comment: Optional[str], backlog: Optional[str]):
         await interaction.response.defer()
-        if interaction.channel.id != 947813835715256393: 
+        if interaction.channel.id != CHANNEL_ID: 
         #if interaction.channel.id !=947813835715256393 or not isinstance(ctx.channel, discord.channel.DMChannel):
             return await interaction.response.send_message(ephemeral=True, content='You can only log in #immersion-log or DMs.')
         
@@ -228,7 +228,7 @@ class Log(commands.Cog):
                     suggestions = [(result['title'], result['id']) for result in json_data['results']]
 
                 elif interaction.namespace['media_type'] == 'Anime':
-                    suggestions = [(f"{result['title']['romaji']} ({result['title']['native']})", result['id']) for result in json_data['data']['Page']['media'] for key, value in result.items()]
+                    suggestions = [(f"{result['title']['romaji']} ({result['title']['native']})", result['id']) for result in json_data['data']['Page']['media']]
 
                 await asyncio.sleep(0)
 
