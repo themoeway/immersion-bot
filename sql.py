@@ -180,77 +180,51 @@ class Set_Goal:
                 db_name, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
             self.conn.row_factory = namedtuple_factory
     
-    def new_goal(self, discord_user_id, media_type, amount, text, created_at, frequency):
+    def new_goal(self, discord_user_id, goal_type, media_type, amount, text, span, created_at, end):
         with self.conn:
             query = """
-            INSERT INTO goals (discord_user_id, media_type, amount, text, created_at, freq)
-            VALUES (?,?,?,?,?,?);
+            INSERT INTO goals (discord_user_id, goal_type, media_type, amount, text, span, created_at, end)
+            VALUES (?,?,?,?,?,?,?,?);
             """
-            data = (discord_user_id, media_type, amount, text, created_at, frequency)
+            data = (discord_user_id, goal_type, media_type, amount, text, span, created_at, end)
             self.conn.execute(query, data)
             
-    def new_point_goal(self, discord_user_id, media_type, amount, text, created_at, frequency):
-        with self.conn:
-            query = """
-            INSERT INTO points (discord_user_id, media_type, amount, text, created_at, freq)
-            VALUES (?,?,?,?,?,?);
-            """
-            print(text)
-            data = (discord_user_id, media_type, amount, text, created_at, frequency)
-            self.conn.execute(query, data)
-            
-    def get_point_goals(self, discord_user_id, timeframe):
-        where_clause = f"discord_user_id={discord_user_id} AND created_at BETWEEN '{timeframe[0]}' AND '{timeframe[1]}'"
-        query = f"""
-        SELECT * FROM points
-        WHERE {where_clause}
-        ORDER BY created_at DESC;
-        """
-        print(query)
-        cursor = self.conn.cursor()
-        cursor.execute(query)
-        return cursor.fetchall()
-            
-    def get_goals(self, discord_user_id, timeframe):
-        where_clause = f"discord_user_id={discord_user_id} AND created_at BETWEEN '{timeframe[0]}' AND '{timeframe[1]}' AND freq IS NULL"
+    def get_goals(self, discord_user_id):
+        where_clause = f"""discord_user_id={discord_user_id}"""
         query = f"""
         SELECT * FROM goals
         WHERE {where_clause}
-        ORDER BY created_at DESC;
+        ORDER BY created_at ASC;
         """
         print(query)
         cursor = self.conn.cursor()
         cursor.execute(query)
         return cursor.fetchall()
     
-    def get_goal_by_medium(self, discord_user_id, timeframe, media_type):
-        where_clause = f"discord_user_id={discord_user_id} AND media_type='{media_type.upper()}' AND created_at BETWEEN '{timeframe[0]}' AND '{timeframe[1]}'"
-        query = f"""
-        SELECT SUM(amount) as da FROM goals
-        WHERE {where_clause};
-        """
-        print(query)
-        cursor = self.conn.cursor()
-        cursor.execute(query)
-        return cursor.fetchall()
-            
-    def get_daily_goals(self, discord_user_id):
-        where_clause = f"discord_user_id={discord_user_id} and freq='Daily'"
-        
-        query = f"""
-        SELECT * FROM goals
-        WHERE {where_clause}
-        ORDER BY created_at DESC;
-        """
-        print(query)
-        cursor = self.conn.cursor()
-        cursor.execute(query)
-        return cursor.fetchall()
-    
-    def check_goal_exists(self, discord_user_id, media_type, amount, text, created_at, frequency, table):
+    def check_goal_exists(self, discord_user_id, goal_type, media_type, text):
+        print(discord_user_id, goal_type, media_type, text)
         query = f"""SELECT EXISTS(
-            SELECT * FROM {table} WHERE discord_user_id=? AND text LIKE ?
+            SELECT * FROM goals WHERE discord_user_id=? AND goal_type=? AND media_type=? AND text LIKE ?
             ) AS didTry"""
         cursor = self.conn.cursor()
-        cursor.execute(query, [discord_user_id, text])
+        cursor.execute(query, [discord_user_id, goal_type, media_type, text])
         return cursor.fetchall()[0][0] == 1
+    
+    def delete_goal(self, discord_user_id, media_type, amount, span):
+        where_clause = f"discord_user_id={discord_user_id} AND media_type='{media_type.upper()}' AND amount={amount} AND span='{span}'"
+        query = f"""
+        DELETE FROM goals WHERE {where_clause}"""
+        print(query)
+        cursor = self.conn.cursor()
+        cursor.execute(query)
+       
+    def get_one_goal(self, discord_user_id, media_type, amount, span):
+        where_clause = f"discord_user_id={discord_user_id} AND media_type='{media_type.upper()}' AND amount={amount} AND span='{span}'"
+        query = f"""
+        SELECT * FROM goals
+        WHERE {where_clause}
+        """
+        print(query)
+        cursor = self.conn.cursor()
+        cursor.execute(query)
+        return cursor.fetchall()
